@@ -3,6 +3,10 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import numpy as np
 from sklearn.preprocessing import LabelEncoder, StandardScaler
+from tensorflow.keras.models import load_model
+
+model_path = "voice_recognition_model.keras"
+model = load_model(model_path)
 
 y_pred = model.predict(X_test)
 y_pred_classes = np.argmax(y_pred, axis=1)

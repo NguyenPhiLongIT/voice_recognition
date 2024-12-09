@@ -1,4 +1,3 @@
-# Baseline
 import os
 import numpy as np
 import pandas as pd
@@ -11,16 +10,31 @@ from tensorflow.keras.layers import Conv1D, MaxPooling1D, Flatten, Dense, Dropou
 from tensorflow.keras.models import Sequential
 import random
 
-alert_audio_path = "dataset/alert"  
-stop_audio_path = "dataset/stop" 
-sample_rate = 22050  
-segment_duration = 0.5 
-overlap = 0.25 
+alert_audio_path = "dataset/alert"
+stop_audio_path = "dataset/stop"
+sample_rate = 22050
+segment_duration = 0.3
+overlap = 0.15
 
 def augment_audio_add_noise(audio, noise_factor=0.005):
     noise = np.random.randn(len(audio))
     augmented_audio = audio + noise_factor * noise
     return augmented_audio
+
+def pitch_shift(audio, sr, n_steps):
+    return librosa.effects.pitch_shift(audio, sr=sr, n_steps=n_steps)
+
+def time_stretch(audio, rate):
+    return librosa.effects.time_stretch(audio, rate=rate)
+
+def remove_background_noise(audio, sr, threshold=0.02):
+    stft = librosa.stft(audio)
+    magnitude, phase = librosa.magphase(stft)
+    
+    filtered_magnitude = np.where(magnitude > threshold, magnitude, 0)
+    filtered_stft = filtered_magnitude * phase
+    
+    return librosa.istft(filtered_stft)
 
 def load_audio_files(folder_path, label, sr=sample_rate, augment=False):
     data = []
@@ -28,10 +42,22 @@ def load_audio_files(folder_path, label, sr=sample_rate, augment=False):
         file_path = os.path.join(folder_path, filename)
         if filename.endswith('.wav'):
             audio, _ = librosa.load(file_path, sr=sr)
-            
-            if augment and random.random() < 0.5:
-                audio = augment_audio_add_noise(audio, noise_factor=0.005)
-            
+
+            audio = librosa.util.normalize(audio)
+            audio = remove_background_noise(audio, sr)
+
+            if augment:
+                augmentation_type = random.choice(['none', 'noise', 'pitch', 'stretch'])
+                if augmentation_type == 'noise':
+                    audio = augment_audio_add_noise(audio, noise_factor=0.005)
+                elif augmentation_type == 'pitch':
+                    n_steps = random.choice([-2, -1, 1, 2])
+                    audio = pitch_shift(audio, sr, n_steps)
+                elif augmentation_type == 'stretch':
+                    rate = random.uniform(0.8, 1.2)
+                    audio = time_stretch(audio, rate)
+
+            audio = librosa.util.normalize(audio)
             data.extend(segment_and_extract_features(audio, label, sr))
     return data
 
@@ -41,33 +67,47 @@ def segment_and_extract_features(audio, label, sr):
     segment_samples = int(segment_duration * sr)
     overlap_samples = int(overlap * sr)
     num_segments = (len(audio) - segment_samples) // (segment_samples - overlap_samples) + 1
-    
+
     for i in range(num_segments):
         start = i * (segment_samples - overlap_samples)
         end = start + segment_samples
         segment = audio[start:end]
-        
+
         mfccs = librosa.feature.mfcc(y=segment, sr=sr, n_mfcc=13)
+        delta_mfcc = librosa.feature.delta(mfccs)
+        delta2_mfcc = librosa.feature.delta(mfccs, order=2)
         chroma = librosa.feature.chroma_stft(y=segment, sr=sr)
+        mel_spectrogram = librosa.feature.melspectrogram(y=segment, sr=sr)
         spectral_centroid = librosa.feature.spectral_centroid(y=segment, sr=sr)
         spectral_bandwidth = librosa.feature.spectral_bandwidth(y=segment, sr=sr)
         rolloff = librosa.feature.spectral_rolloff(y=segment, sr=sr)
         zero_crossing_rate = librosa.feature.zero_crossing_rate(y=segment)
-        
+        rms = librosa.feature.rms(y=segment)
+        spectral_flatness = librosa.feature.spectral_flatness(y=segment)
+
         feature_dict = {
             'mfcc_mean': np.mean(mfccs, axis=1),
             'mfcc_std': np.std(mfccs, axis=1),
-            'chroma': np.mean(chroma, axis=1),
+            'delta_mfcc_mean': np.mean(delta_mfcc, axis=1),
+            'delta_mfcc_std': np.std(delta_mfcc, axis=1),
+            'delta2_mfcc_mean': np.mean(delta2_mfcc, axis=1),
+            'delta2_mfcc_std': np.std(delta2_mfcc, axis=1),
+            'chroma_mean': np.mean(chroma, axis=1),
+            'chroma_std': np.std(chroma, axis=1),
+            'mel_spectrogram_mean': np.mean(mel_spectrogram, axis=1),
+            'mel_spectrogram_std': np.std(mel_spectrogram, axis=1),
             'spectral_centroid': np.mean(spectral_centroid),
             'spectral_bandwidth': np.mean(spectral_bandwidth),
             'rolloff': np.mean(rolloff),
             'zero_crossing_rate': np.mean(zero_crossing_rate),
+            'rms': np.mean(rms),
+            'spectral_flatness': np.mean(spectral_flatness),
             'label': label
         }
         features.append(feature_dict)
     return features
 
-alert_data = load_audio_files(alert_audio_path, label='Alert', augment=False)
+alert_data = load_audio_files(alert_audio_path, label='Alert', augment=True)
 stop_data = load_audio_files(stop_audio_path, label='Stop', augment=True)
 all_data = alert_data + stop_data
 
@@ -76,7 +116,8 @@ df = pd.DataFrame(all_data)
 X = pd.concat([
     pd.DataFrame(df['mfcc_mean'].tolist()),
     pd.DataFrame(df['mfcc_std'].tolist()),
-    pd.DataFrame(df['chroma'].tolist()),
+    pd.DataFrame(df['chroma_mean'].tolist()),  
+    pd.DataFrame(df['chroma_std'].tolist()),
     df[['spectral_centroid', 'spectral_bandwidth', 'rolloff', 'zero_crossing_rate']]
 ], axis=1)
 y = df['label']
@@ -100,19 +141,20 @@ model = Sequential([
     Conv1D(32, 3, activation='relu', input_shape=(X_train.shape[1], 1)),
     MaxPooling1D(2),
     Dropout(0.2),
-    Conv1D(64, 3, activation='relu'),
+    Conv1D(64, 5, activation='relu'),
     MaxPooling1D(2),
     Dropout(0.2),
     Flatten(),
-    Dense(32, activation='relu'),
+    Dense(64, activation='relu'),
     Dropout(0.5),
     Dense(y.shape[1], activation='softmax')
 ])
 model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
 
-early_stopping = tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=2, restore_best_weights=True)
-history = model.fit(X_train, y_train, validation_data=(X_test, y_test), epochs=10, batch_size=4, callbacks=[early_stopping])
+early_stopping = tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=5, restore_best_weights=True)
 
+history = model.fit(X_train, y_train, validation_data=(X_test, y_test), epochs=20, batch_size=16, callbacks=[early_stopping] )
+model.save('voice_recognition_model.keras')
 
 loss, accuracy = model.evaluate(X_test, y_test)
 print(f"Test Loss: {loss:.4f}, Test Accuracy: {accuracy:.4f}")
