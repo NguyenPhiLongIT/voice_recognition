@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <title>Voice Recognition</title>
+</head>
+
+<body>
+    <h1>Voice Recognition</h1>
+    <div id="app">
+        <button onclick="startRecording()" id="recordBtn">Record</button>
+        <input type="file" id="uploadInput" accept="audio/*">
+        <button id="uploadBtn">Upload</button>
+        <div id="alert" style="color: red; font-size: 20px; margin-top: 20px;"></div>
+        <div id="result"></div>
+    </div>
+</body>
+
+<script>
+    let isRecording = false;
+    let mediaRecorder;
+    let audioChunks = [];
+    let audioBlob;
+    const alertDiv = document.getElementById("alert");
+    const recordBtn = document.getElementById("recordBtn");
+    const uploadBtn = document.getElementById("uploadBtn");
+    const resultDiv = document.getElementById("result");
+
+    // Bắt đầu thu âm
+    function startRecording() {
+        if (!isRecording) {
+            isRecording = true;
+            audioChunks = [];  // Reset audioChunks khi bắt đầu thu âm
+
+            navigator.mediaDevices.getUserMedia({ audio: true })
+                .then(stream => {
+                    mediaRecorder = new MediaRecorder(stream);
+
+                    // Khi có dữ liệu âm thanh mới
+                    mediaRecorder.ondataavailable = event => {
+                        audioChunks.push(event.data);  // Lưu dữ liệu âm thanh vào array
+                        sendAudio(event.data);  // Gửi dữ liệu âm thanh ngay lập tức
+                    };
+
+                    // Khi dừng ghi âm
+                    mediaRecorder.onstop = () => {
+                        const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+                        sendAudio(audioBlob);  // Gửi tệp âm thanh khi thu âm xong
+                    };
+
+                    // Thay đổi nút và trạng thái
+                    recordBtn.textContent = "Stop Recording";
+                    alertDiv.textContent = "";  // Clear previous alert message
+
+                    mediaRecorder.start(1000);  // Gửi dữ liệu âm thanh mỗi giây (1000ms)
+                    console.log("Recording started...");
+                })
+                .catch(err => {
+                    console.error("Error accessing audio stream:", err);
+                    alertDiv.textContent = "Error accessing microphone.";
+                });
+        } else {
+            isRecording = false;
+            mediaRecorder.stop();  // Dừng ghi âm khi nút bị nhấn lại
+            recordBtn.textContent = "Start Recording";
+            alertDiv.textContent = "Recording stopped.";
+            console.log("Recording stopped.");
+        }
+    }
+
+    // Hàm gửi dữ liệu âm thanh tới Flask backend
+    function sendAudio(audioBlob) {
+        const formData = new FormData();
+        formData.append("audio", audioBlob, "audio_chunk.wav");
+
+        fetch("/classify-realtime", {
+            method: "POST",
+            body: formData
+        })
+            .then(response => response.json())
+            .then(data => {
+                console.log("Audio chunk uploaded:", data);
+                // Hiển thị kết quả phân loại hoặc bất kỳ phản hồi nào từ server
+                document.getElementById("result").textContent = `Result: ${data.message}`;
+            })
+            .catch(error => {
+                console.error("Error uploading audio chunk:", error);
+            });
+    }
+
+    uploadBtn.addEventListener("click", async () => {
+        const formData = new FormData();
+
+        if (audioBlob) {
+            formData.append("audio", audioBlob, "recording.wav");
+        } else if (uploadInput.files.length > 0) {
+            formData.append("audio", uploadInput.files[0]);
+        } else {
+            resultDiv.textContent = "No audio selected!";
+            return;
+        }
+
+        resultDiv.textContent = "Uploading...";
+
+        const response = await fetch("/upload", {
+            method: "POST",
+            body: formData,
+        });
+
+        const result = await response.json();
+        if (response.ok) {
+            resultDiv.textContent = `Prediction: ${result.label}, Confidence: ${result.confidence.toFixed(2)}`;
+        } else {
+            resultDiv.textContent = `Error: ${result.error}`;
+        }
+    });
+
+</script>
+
+</html>
