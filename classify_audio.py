@@ -11,7 +11,9 @@ import upload_download
 upload_download.download_file_pyrebase()
 
 sample_rate = 22050
-model_path = upload_download.MODEL_FILE
+# model_path = upload_download.MODEL_FILE
+# model = load_model(model_path)
+model_path = "voice_recognition_modeltest.keras"
 model = load_model(model_path)
 segment_duration = 0.3
 overlap = 0.15

@@ -12,7 +12,7 @@ firebaseConfig = {
   'measurementId': "G-PPPSW2DZ7B"
 }
 LOCAL_UPLOAD_PATH = "model/voice_recognition_model.keras"
-CLOUD_MODEL_PATH = "models/voice.keras"
+CLOUD_MODEL_PATH = "models/voice_final.keras"
 LOCAL_DOWNLOAD_PATH = "downloaded_models"
 MODEL_FILE = "downloaded_models/voice.keras"
 

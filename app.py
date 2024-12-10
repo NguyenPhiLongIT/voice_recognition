@@ -3,6 +3,8 @@ from werkzeug.utils import secure_filename
 import os
 import librosa
 import classify_audio
+from playsound import playsound
+import threading
 
 app = Flask(__name__, static_folder="public", static_url_path="/public")
 app.config['UPLOAD_FOLDER'] = 'uploads/'  # Thư mục lưu file ghi âm tạm thời
@@ -11,6 +13,15 @@ os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 model = classify_audio.model
 scaler = classify_audio.scaler
 label_encoder = classify_audio.label_encoder
+
+ALERT_SOUND_PATH = "./public/alert_sound.wav"
+
+alert_playing = False
+
+def play_alert_sound():
+    global alert_playing
+    while alert_playing:
+        playsound(ALERT_SOUND_PATH)
 
 
 @app.route('/')
@@ -42,6 +53,7 @@ def classify_realtime():
 
 @app.route('/upload', methods=['POST'])
 def upload_audio():
+    global alert_playing
     if 'audio' not in request.files:
         return jsonify({"error": "No audio file provided"}), 400
 
@@ -59,6 +71,13 @@ def upload_audio():
         predicted_label, confidence = classify_audio.classify_full_audio(model, audio, sr)
         confidence = float(confidence)
         os.remove(file_path)
+
+        if predicted_label == "Alert":
+            if not alert_playing:
+                alert_playing = True
+                threading.Thread(target=play_alert_sound, daemon=True).start()
+        elif predicted_label == "Stop":
+            alert_playing = False
 
         return jsonify({"label": predicted_label, "confidence": confidence})
     except Exception as e:
