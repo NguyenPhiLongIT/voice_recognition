@@ -6,8 +6,12 @@ import librosa
 import pickle
 import joblib
 
+import upload_download
+
+upload_download.download_file_pyrebase()
+
 sample_rate = 22050
-model_path = "model/voice_recognition_model.h5"
+model_path = "MODEL_FILE"
 model = load_model(model_path)
 segment_duration = 0.3
 overlap = 0.15
