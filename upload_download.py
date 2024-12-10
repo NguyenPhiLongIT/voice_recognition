@@ -11,10 +11,11 @@ firebaseConfig = {
   'appId': "1:76205606772:web:7aaa9d9d23336af88e8e21",
   'measurementId': "G-PPPSW2DZ7B"
 }
-LOCAL_UPLOAD_PATH = "model/voice_recognition_model.keras"
-CLOUD_MODEL_PATH = "models/voice_final.keras"
+LOCAL_UPLOAD_PATH = "final.keras"
+CLOUD_MODEL_PATH = "models/final.keras"
+
 LOCAL_DOWNLOAD_PATH = "downloaded_models"
-MODEL_FILE = "downloaded_models/voice.keras"
+MODEL_FILE = "downloaded_models/final.keras"
 
 firebase = pyrebase.initialize_app(firebaseConfig)
 storage = firebase.storage()
@@ -23,10 +24,10 @@ import os
 os.makedirs("downloaded_models", exist_ok=True)
 
 # Upload file lên Cloud Storage
-def upload_file_pyrebase(storage, local_path, cloud_path):
+def upload_file_pyrebase():
     try:
-        storage.child(cloud_path).put(local_path)
-        print(f"File uploaded to {cloud_path}")
+        storage.child(CLOUD_MODEL_PATH).put(LOCAL_UPLOAD_PATH)
+        print(f"File uploaded to {CLOUD_MODEL_PATH}")
     except Exception as e:
         print(f"Error uploading file: {e}")
 

@@ -12,8 +12,7 @@ upload_download.download_file_pyrebase()
 
 sample_rate = 22050
 # model_path = upload_download.MODEL_FILE
-# model = load_model(model_path)
-model_path = "voice_recognition_modeltest.keras"
+model_path = "downloaded_models/final.keras"
 model = load_model(model_path)
 segment_duration = 0.3
 overlap = 0.15
@@ -89,7 +88,7 @@ def classify_full_audio(model, audio, sr=sample_rate):
 
     confidence_scores = segment_predictions.max(axis=1)
     avg_confidence = np.mean(confidence_scores)
-    confidence_threshold = 0.72
+    confidence_threshold = 0.75
     if avg_confidence < confidence_threshold:
         return "Unknown", avg_confidence
 

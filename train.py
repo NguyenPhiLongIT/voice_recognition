@@ -11,6 +11,8 @@ from tensorflow.keras.models import Sequential
 import random
 import upload_download
 
+import upload_download
+
 alert_audio_path = "dataset/alert"
 stop_audio_path = "dataset/stop"
 sample_rate = 22050
@@ -154,8 +156,9 @@ model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accur
 
 early_stopping = tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=5, restore_best_weights=True)
 
-history = model.fit(X_train, y_train, validation_data=(X_test, y_test), epochs=2, batch_size=16, callbacks=[early_stopping] )
-model.save('voice_recognition_modeltest.keras')
+
+history = model.fit(X_train, y_train, validation_data=(X_test, y_test), epochs=20, batch_size=16, callbacks=[early_stopping] )
+model.save('final.keras')
 
 upload_download.upload_file_pyrebase()
 
