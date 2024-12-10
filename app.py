@@ -5,6 +5,7 @@ import librosa
 import classify_audio
 from playsound import playsound
 import threading
+import pygame
 
 app = Flask(__name__, static_folder="public", static_url_path="/public")
 app.config['UPLOAD_FOLDER'] = 'uploads/'  # Thư mục lưu file ghi âm tạm thời
@@ -14,14 +15,16 @@ model = classify_audio.model
 scaler = classify_audio.scaler
 label_encoder = classify_audio.label_encoder
 
-ALERT_SOUND_PATH = "./public/alert_sound.wav"
-
+ALERT_SOUND_PATH = "./public/alert_sound.mp3"
 alert_playing = False
+alert_channel = None
+pygame.mixer.init()
 
 def play_alert_sound():
-    global alert_playing
-    while alert_playing:
-        playsound(ALERT_SOUND_PATH)
+    global alert_channel
+    alert_channel = pygame.mixer.Channel(0)  # Sử dụng kênh 0
+    sound = pygame.mixer.Sound(ALERT_SOUND_PATH)
+    alert_channel.play(sound, loops=-1)
 
 
 @app.route('/')
@@ -77,7 +80,9 @@ def upload_audio():
                 alert_playing = True
                 threading.Thread(target=play_alert_sound, daemon=True).start()
         elif predicted_label == "Stop":
-            alert_playing = False
+            if alert_playing and alert_channel is not None:
+                alert_channel.stop()  # Dừng ngay lập tức
+                alert_playing = False
 
         return jsonify({"label": predicted_label, "confidence": confidence})
     except Exception as e:

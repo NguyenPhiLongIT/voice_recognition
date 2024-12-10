@@ -8,11 +8,11 @@ import joblib
 
 import upload_download
 
-upload_download.download_file_pyrebase()
+# upload_download.download_file_pyrebase()
 
 sample_rate = 22050
 # model_path = upload_download.MODEL_FILE
-model_path = "downloaded_models/final.keras"
+model_path = "model/voice_recognition_model.keras"
 model = load_model(model_path)
 segment_duration = 0.3
 overlap = 0.15
