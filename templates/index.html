@@ -11,113 +11,117 @@
 <body>
     <h1>Voice Recognition</h1>
     <div id="app">
-        <button onclick="startRecording()" id="recordBtn">Record</button>
+        <button id="recordBtn">Record</button>
         <input type="file" id="uploadInput" accept="audio/*">
         <button id="uploadBtn">Upload</button>
-        <div id="alert" style="color: red; font-size: 20px; margin-top: 20px;"></div>
+        <div id="alertDiv" style="color: red; font-size: 20px; margin-top: 20px;"></div>
         <div id="result"></div>
     </div>
-</body>
+    <script src="https://cdn.rawgit.com/mattdiamond/Recorderjs/08e7abd9/dist/recorder.js"></script>
+    <script>
+        let isRecording = false;
+        let audioBlobs = [];
+        let recorder;
+        let audioContext;
+        let capturedStream = null;
+        const recordBtn = document.getElementById('recordBtn');
+        const alertDiv = document.getElementById('alertDiv');
 
-<script>
-    let isRecording = false;
-    let mediaRecorder;
-    let audioChunks = [];
-    let audioBlob;
-    const alertDiv = document.getElementById("alert");
-    const recordBtn = document.getElementById("recordBtn");
-    const uploadBtn = document.getElementById("uploadBtn");
-    const resultDiv = document.getElementById("result");
+        let recordingInterval;  // Timer để ghi âm sau mỗi khoảng thời gian
+        let timerDuration = 3000;  // Thời gian chờ mỗi lần gửi (3 giây)
 
-    // Bắt đầu thu âm
-    function startRecording() {
-        if (!isRecording) {
-            isRecording = true;
-            audioChunks = [];  // Reset audioChunks khi bắt đầu thu âm
+        recordBtn.addEventListener("click", async () => {
+            if (!isRecording) {
+                try {
+                    // Request access to the microphone
+                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    capturedStream = stream;
 
-            navigator.mediaDevices.getUserMedia({ audio: true })
-                .then(stream => {
-                    mediaRecorder = new MediaRecorder(stream);
+                    // Create an AudioContext and a Recorder instance
+                    audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                    recorder = new Recorder(audioContext.createMediaStreamSource(stream), { numChannels: 1 });
 
-                    // Khi có dữ liệu âm thanh mới
-                    mediaRecorder.ondataavailable = event => {
-                        audioChunks.push(event.data);  // Lưu dữ liệu âm thanh vào array
-                        sendAudio(event.data);  // Gửi dữ liệu âm thanh ngay lập tức
-                    };
-
-                    // Khi dừng ghi âm
-                    mediaRecorder.onstop = () => {
-                        const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
-                        sendAudio(audioBlob);  // Gửi tệp âm thanh khi thu âm xong
-                    };
-
-                    // Thay đổi nút và trạng thái
+                    // Bắt đầu ghi âm
+                    recorder.record();
+                    isRecording = true;
                     recordBtn.textContent = "Stop Recording";
-                    alertDiv.textContent = "";  // Clear previous alert message
-
-                    mediaRecorder.start(1000);  // Gửi dữ liệu âm thanh mỗi giây (1000ms)
+                    alertDiv.textContent = "";
                     console.log("Recording started...");
-                })
-                .catch(err => {
+
+                    // Gửi âm thanh sau mỗi 3 giây
+                    recordingInterval = setInterval(() => {
+                        recorder.exportWAV((blob) => {
+                            audioBlobs.push(blob);
+                            sendAudio(blob);  // Gửi âm thanh lên server
+                        });
+                    }, timerDuration);
+
+                } catch (err) {
                     console.error("Error accessing audio stream:", err);
-                    alertDiv.textContent = "Error accessing microphone.";
-                });
-        } else {
-            isRecording = false;
-            mediaRecorder.stop();  // Dừng ghi âm khi nút bị nhấn lại
-            recordBtn.textContent = "Start Recording";
-            alertDiv.textContent = "Recording stopped.";
-            console.log("Recording stopped.");
-        }
-    }
-
-    // Hàm gửi dữ liệu âm thanh tới Flask backend
-    function sendAudio(audioBlob) {
-        const formData = new FormData();
-        formData.append("audio", audioBlob, "audio_chunk.wav");
-
-        fetch("/classify-realtime", {
-            method: "POST",
-            body: formData
-        })
-            .then(response => response.json())
-            .then(data => {
-                console.log("Audio chunk uploaded:", data);
-                // Hiển thị kết quả phân loại hoặc bất kỳ phản hồi nào từ server
-                document.getElementById("result").textContent = `Result: ${data.message}`;
-            })
-            .catch(error => {
-                console.error("Error uploading audio chunk:", error);
-            });
-    }
-
-    uploadBtn.addEventListener("click", async () => {
-        const formData = new FormData();
-
-        if (audioBlob) {
-            formData.append("audio", audioBlob, "recording.wav");
-        } else if (uploadInput.files.length > 0) {
-            formData.append("audio", uploadInput.files[0]);
-        } else {
-            resultDiv.textContent = "No audio selected!";
-            return;
-        }
-
-        resultDiv.textContent = "Uploading...";
-
-        const response = await fetch("/upload", {
-            method: "POST",
-            body: formData,
+                }
+            } else {
+                // Dừng ghi âm khi đã có yêu cầu dừng
+                isRecording = false;
+                recorder.stop();
+                clearInterval(recordingInterval);  // Dừng hẹn giờ
+                recordBtn.textContent = "Start Recording";
+                alertDiv.textContent = "Recording stopped.";
+                console.log("Recording stopped.");
+            }
         });
 
-        const result = await response.json();
-        if (response.ok) {
-            resultDiv.textContent = `Prediction: ${result.label}, Confidence: ${result.confidence.toFixed(2)}`;
-        } else {
-            resultDiv.textContent = `Error: ${result.error}`;
-        }
-    });
+        // Function to send the audio file to the server
+        function sendAudio(audioBlob) {
+            const formData = new FormData();
+            formData.append("audio", audioBlob, "audio_chunk.wav");
 
-</script>
+            fetch("/upload", {
+                method: "POST",
+                body: formData,
+            })
+                .then(response => response.json())
+                .then(data => {
+                    console.log("Audio chunk uploaded:", data);
+                    if (data) {
+                        alertDiv.textContent = `Prediction: ${data.label}, Confidence: ${data.confidence.toFixed(2)}`;
+                    } else {
+                        alertDiv.textContent = "Unexpected result format from server.";
+                    }
+                })
+                .catch(error => {
+                    console.error("Error uploading audio chunk:", error);
+                    // alertDiv.textContent = "Error uploading audio!";
+                });
+        }
+
+        uploadBtn.addEventListener("click", async () => {
+            const formData = new FormData();
+
+            if (audioBlob) {
+                formData.append("audio", audioBlob, "recording.wav");
+            } else if (uploadInput.files.length > 0) {
+                formData.append("audio", uploadInput.files[0]);
+            } else {
+                resultDiv.textContent = "No audio selected!";
+                return;
+            }
+
+            resultDiv.textContent = "Uploading...";
+
+            const response = await fetch("/upload", {
+                method: "POST",
+                body: formData,
+            });
+
+            const result = await response.json();
+            if (response.ok) {
+                resultDiv.textContent = `Prediction: ${result.label}, Confidence: ${result.confidence.toFixed(2)}`;
+            } else {
+                resultDiv.textContent = `Error: ${result.error}`;
+            }
+        });
+
+    </script>
+</body>
 
 </html>
