@@ -7,7 +7,7 @@ import pickle
 import joblib
 
 sample_rate = 22050
-model_path = "model/voice_recognition_model.keras"
+model_path = "model/voice_recognition_model.h5"
 model = load_model(model_path)
 segment_duration = 0.3
 overlap = 0.15

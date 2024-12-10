@@ -4,8 +4,8 @@ import numpy as np
 import soundfile as sf
 
 SAMPLE_RATE = 22050  
-alert_path = "dataset/alert"
-stop_path = "dataset/stop"
+alert_path = "data/alert"
+stop_path = "data/stop"
 
 
 def add_noise(audio, noise_factor=0.005):
@@ -34,10 +34,10 @@ def make_noisy(path):
             # noisy_audio = add_noise(y, noise_factor=0.005)
             # noisy_audio = pitch_shift(y, sr=SAMPLE_RATE, n_steps=-2)   
             # noisy_audio = time_stretch(y, rate=0.8)
-            noisy_audio2 = time_stretch(y, rate=1.3)
+            noisy_audio2 = time_stretch(y, rate=0.85)
             # noisy_audio = increase_volume(y, factor=2)
             augmented_file_name = f"stop{file_counter:02d}.wav"
-            augmented_file_path = os.path.join(stop, augmented_file_name)
+            augmented_file_path = os.path.join(stop_path, augmented_file_name)
 
             # Lưu file đã xử lý
             sf.write(augmented_file_path, noisy_audio2, sr)
@@ -45,8 +45,8 @@ def make_noisy(path):
             # Tăng biến đếm
             file_counter += 1
             # Lưu file mới
-            # augmented_file_path = os.path.join(alert_louder, f"{file_name}")
+            # augmented_file_path = os.path.join(stop_louder, f"{file_name}")
             # sf.write(augmented_file_path, noisy_audio, sr)
 
 
-make_noisy(stop)
+make_noisy(stop_path)

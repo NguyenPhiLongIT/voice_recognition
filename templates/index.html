@@ -14,45 +14,41 @@
         <button id="recordBtn">Record</button>
         <input type="file" id="uploadInput" accept="audio/*">
         <button id="uploadBtn">Upload</button>
-        <div id="alertDiv" style="color: red; font-size: 20px; margin-top: 20px;"></div>
-        <div id="result"></div>
+        <div id="result" style="color: red; font-size: 20px; margin-top: 20px;"></div>
     </div>
     <script src="https://cdn.rawgit.com/mattdiamond/Recorderjs/08e7abd9/dist/recorder.js"></script>
     <script>
         let isRecording = false;
         let audioBlobs = [];
+        let audioBlob;
         let recorder;
         let audioContext;
         let capturedStream = null;
         const recordBtn = document.getElementById('recordBtn');
-        const alertDiv = document.getElementById('alertDiv');
+        const result = document.getElementById('result');
 
-        let recordingInterval;  // Timer để ghi âm sau mỗi khoảng thời gian
-        let timerDuration = 3000;  // Thời gian chờ mỗi lần gửi (3 giây)
+        let recordingInterval; 
+        let timerDuration = 3000;  
 
         recordBtn.addEventListener("click", async () => {
             if (!isRecording) {
                 try {
-                    // Request access to the microphone
                     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
                     capturedStream = stream;
 
-                    // Create an AudioContext and a Recorder instance
                     audioContext = new (window.AudioContext || window.webkitAudioContext)();
                     recorder = new Recorder(audioContext.createMediaStreamSource(stream), { numChannels: 1 });
 
-                    // Bắt đầu ghi âm
                     recorder.record();
                     isRecording = true;
                     recordBtn.textContent = "Stop Recording";
-                    alertDiv.textContent = "";
+                    result.textContent = "";
                     console.log("Recording started...");
 
-                    // Gửi âm thanh sau mỗi 3 giây
                     recordingInterval = setInterval(() => {
                         recorder.exportWAV((blob) => {
                             audioBlobs.push(blob);
-                            sendAudio(blob);  // Gửi âm thanh lên server
+                            sendAudio(blob);  
                         });
                     }, timerDuration);
 
@@ -60,12 +56,12 @@
                     console.error("Error accessing audio stream:", err);
                 }
             } else {
-                // Dừng ghi âm khi đã có yêu cầu dừng
                 isRecording = false;
                 recorder.stop();
-                clearInterval(recordingInterval);  // Dừng hẹn giờ
+                clearInterval(recordingInterval); 
+                capturedStream.getTracks().forEach(track => track.stop());
                 recordBtn.textContent = "Start Recording";
-                alertDiv.textContent = "Recording stopped.";
+                result.textContent = "Recording stopped.";
                 console.log("Recording stopped.");
             }
         });
@@ -83,14 +79,14 @@
                 .then(data => {
                     console.log("Audio chunk uploaded:", data);
                     if (data) {
-                        alertDiv.textContent = `Prediction: ${data.label}, Confidence: ${data.confidence.toFixed(2)}`;
+                        result.textContent = `Prediction: ${data.label}, Confidence: ${data.confidence.toFixed(2)}`;
                     } else {
-                        alertDiv.textContent = "Unexpected result format from server.";
+                        result.textContent = "Unexpected result format from server.";
                     }
                 })
                 .catch(error => {
                     console.error("Error uploading audio chunk:", error);
-                    // alertDiv.textContent = "Error uploading audio!";
+                    // result.textContent = "Error uploading audio!";
                 });
         }
 
@@ -102,22 +98,22 @@
             } else if (uploadInput.files.length > 0) {
                 formData.append("audio", uploadInput.files[0]);
             } else {
-                resultDiv.textContent = "No audio selected!";
+                result.textContent = "No audio selected!";
                 return;
             }
 
-            resultDiv.textContent = "Uploading...";
+            result.textContent = "Uploading...";
 
             const response = await fetch("/upload", {
                 method: "POST",
                 body: formData,
             });
 
-            const result = await response.json();
+            const responseData = await response.json();
             if (response.ok) {
-                resultDiv.textContent = `Prediction: ${result.label}, Confidence: ${result.confidence.toFixed(2)}`;
+                result.textContent = `Prediction: ${responseData.label}, Confidence: ${responseData.confidence.toFixed(2)}`;
             } else {
-                resultDiv.textContent = `Error: ${result.error}`;
+                result.textContent = `Error: ${responseData.error}`;
             }
         });
 
