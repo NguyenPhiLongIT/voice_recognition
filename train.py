@@ -10,6 +10,8 @@ from tensorflow.keras.layers import Conv1D, MaxPooling1D, Flatten, Dense, Dropou
 from tensorflow.keras.models import Sequential
 import random
 
+import upload_download
+
 alert_audio_path = "dataset/alert"
 stop_audio_path = "dataset/stop"
 sample_rate = 22050
@@ -154,7 +156,9 @@ model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accur
 early_stopping = tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=5, restore_best_weights=True)
 
 history = model.fit(X_train, y_train, validation_data=(X_test, y_test), epochs=20, batch_size=16, callbacks=[early_stopping] )
-model.save('voice_recognition_model.h5')
+model.save('final.keras')
+
+upload_download.upload_file_pyrebase()
 
 loss, accuracy = model.evaluate(X_test, y_test)
 print(f"Test Loss: {loss:.4f}, Test Accuracy: {accuracy:.4f}")
