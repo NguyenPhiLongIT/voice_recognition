@@ -13,6 +13,7 @@ firebaseConfig = {
 }
 LOCAL_UPLOAD_PATH = "final.keras"
 CLOUD_MODEL_PATH = "models/final.keras"
+
 LOCAL_DOWNLOAD_PATH = "downloaded_models"
 MODEL_FILE = "downloaded_models/final.keras"
 

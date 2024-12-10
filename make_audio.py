@@ -24,7 +24,7 @@ def increase_volume(audio, factor=2.0):
     return audio
 
 def make_noisy(path):
-    file_counter = 161
+    file_counter =321
     for file_name in os.listdir(path):
         if file_name.endswith('.wav'):
             file_path = os.path.join(path, file_name)
@@ -32,15 +32,15 @@ def make_noisy(path):
             
             # Thêm nhiễu vào tín hiệu âm thanh
             # noisy_audio = add_noise(y, noise_factor=0.005)
-            # noisy_audio = pitch_shift(y, sr=SAMPLE_RATE, n_steps=-2)   
-            # noisy_audio = time_stretch(y, rate=0.8)
-            noisy_audio2 = time_stretch(y, rate=0.85)
+            # noisy_audio = pitch_shift(y, sr=SAMPLE_RATE, n_steps=2)   
+            # noisy_audio = time_stretch(y, rate=1.15)
+            noisy_audio = time_stretch(y, rate=0.85)
             # noisy_audio = increase_volume(y, factor=2)
             augmented_file_name = f"stop{file_counter:02d}.wav"
             augmented_file_path = os.path.join(stop_path, augmented_file_name)
 
             # Lưu file đã xử lý
-            sf.write(augmented_file_path, noisy_audio2, sr)
+            sf.write(augmented_file_path, noisy_audio, sr)
 
             # Tăng biến đếm
             file_counter += 1
